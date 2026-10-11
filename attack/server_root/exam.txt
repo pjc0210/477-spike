@@ -1,8 +1,0 @@
-CSSE 477 - Networked Applications
-Midterm Examination (CONFIDENTIAL)
------------------------------------
-Do not distribute before the scheduled exam window.
-
-1. Explain the FTP active vs. passive data connection model.
-2. Describe the TCP three-way handshake.
-3. What problem does the sliding window protocol solve?
