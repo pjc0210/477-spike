@@ -2,8 +2,10 @@
 """
 Minimal pyftpdlib-based FTP server for the attack simulation.
 
-Root of the server is ./server_root (contains the "sensitive" exam.txt).
-Only ONE account exists: it owns server_root with full read/write/delete
+The server's document root (--root) is the pyftpdlib/ checkout itself,
+with the "sensitive" exam.txt dropped directly into it -- so this demo
+serves the real project directory, not a separate scratch folder. Only
+ONE account exists: it owns that root with full read/write/delete
 permissions. There is NO anonymous access, so "in theory" nobody can touch
 exam.txt without that account's password.
 

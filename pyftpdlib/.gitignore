@@ -16,3 +16,8 @@ syntax: glob
 .tox/
 build/
 dist/
+
+# written here by ../attack/attack.sh (security spike demo), which uses
+# this checkout as the FTP server's document root; deleted again by the
+# same script, but ignored here too in case a run gets interrupted
+exam.txt

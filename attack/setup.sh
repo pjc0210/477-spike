@@ -25,14 +25,28 @@ if [[ ! -f "${PYFTPDLIB_SRC}/pyftpdlib/__init__.py" ]]; then
     exit 1
 fi
 
-echo "[setup] installing a JDK (for javac) ..."
+echo "[setup] checking for a JDK (javac) ..."
 if ! command -v javac >/dev/null 2>&1; then
-    apt-get update
-    apt-get install -y openjdk-21-jdk-headless
+    echo "Could not find 'javac' on PATH." >&2
+    echo "Install a JDK and make sure its bin/ directory is on PATH, then re-run." >&2
+    echo "  Windows (winget):  winget install EclipseAdoptium.Temurin.21.JDK" >&2
+    echo "  macOS (Homebrew):  brew install openjdk@21" >&2
+    echo "  Debian/Ubuntu:     sudo apt-get install openjdk-21-jdk-headless" >&2
+    exit 1
 fi
 
-echo "[setup] installing asyncore/asynchat backports (needed on Python 3.12+, pyftpdlib predates their removal) ..."
-pip install --break-system-packages pyasynchat pyasyncore
+echo "[setup] checking that this Python can import pyftpdlib from PYFTPDLIB_SRC ..."
+if ! IMPORT_ERR=$(PYTHONPATH="${PYFTPDLIB_SRC}${PYTHONPATH:+:${PYTHONPATH}}" python3 -c "import pyftpdlib" 2>&1); then
+    echo "python3 ($(command -v python3)) could not import pyftpdlib from ${PYFTPDLIB_SRC}:" >&2
+    echo "${IMPORT_ERR}" >&2
+    echo >&2
+    echo "pyftpdlib's handler code imports the stdlib 'asyncore'/'asynchat' modules," >&2
+    echo "which were removed in Python 3.12+ (PEP 594). If that's the failure above," >&2
+    echo "either run this with a Python 3.10/3.11 interpreter, or install the" >&2
+    echo "backport packages yourself first:" >&2
+    echo "    python3 -m pip install pyasynchat pyasyncore" >&2
+    exit 1
+fi
 
 echo "[setup] compiling jFTP's real Crypto.java + the CryptoCli wrapper ..."
 mkdir -p "${DEMO_DIR}/crypto_helper/out"
