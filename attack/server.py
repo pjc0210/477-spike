@@ -13,22 +13,20 @@ it into a jFTP bookmark file via the real Crypto.Encrypt(), and (b) use the
 server logs to confirm who actually logged in and when.
 """
 import argparse
+import os
 import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import check_asyncore_available, pyftpdlib_src  # noqa: E402
+# Point this at the directory that CONTAINS the pyftpdlib/ package (i.e. the
+# pyftpdlib checkout root), either via the PYFTPDLIB_SRC env var or by
+# editing the default below. Also settable via PYTHONPATH before invoking
+# this script, in which case this insert is a harmless no-op duplicate.
+sys.path.insert(0, os.environ.get(
+    "PYFTPDLIB_SRC", "/home/claude/work/477-spike/pyftpdlib"
+))
 
-# Point sys.path at the directory that CONTAINS the pyftpdlib/ package (the
-# pyftpdlib checkout root). By default this is the `pyftpdlib/` directory
-# that sits as a sibling of this repo's `attack/` folder; override with the
-# PYFTPDLIB_SRC environment variable if yours lives elsewhere.
-sys.path.insert(0, str(pyftpdlib_src()))
-check_asyncore_available()
-
-from pyftpdlib.authorizers import DummyAuthorizer  # noqa: E402
-from pyftpdlib.handlers import FTPHandler  # noqa: E402
-from pyftpdlib.servers import FTPServer  # noqa: E402
+from pyftpdlib.authorizers import DummyAuthorizer
+from pyftpdlib.handlers import FTPHandler
+from pyftpdlib.servers import FTPServer
 
 
 def main():

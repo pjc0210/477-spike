@@ -1,7 +1,0 @@
-# attack/ demo: runtime artifacts produced by running attack.py / setup.py
-attack/attacker_workspace/
-attack/jftp_config/
-attack/logs/
-attack/crypto_helper/out/
-__pycache__/
-*.pyc
