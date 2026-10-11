@@ -17,12 +17,16 @@ import os
 import sys
 
 # Point this at the directory that CONTAINS the pyftpdlib/ package (i.e. the
-# pyftpdlib checkout root), either via the PYFTPDLIB_SRC env var or by
-# editing the default below. Also settable via PYTHONPATH before invoking
-# this script, in which case this insert is a harmless no-op duplicate.
-sys.path.insert(0, os.environ.get(
-    "PYFTPDLIB_SRC", "/home/claude/work/477-spike/pyftpdlib"
-))
+# pyftpdlib checkout root). Defaults to the pyftpdlib/ folder that sits as a
+# sibling of this repo's attack/ folder (this repo's actual layout);
+# override with the PYFTPDLIB_SRC env var (attack.sh/setup.sh both export
+# it) if yours lives elsewhere. Also settable via PYTHONPATH before
+# invoking this script, in which case this insert is a harmless no-op
+# duplicate.
+_DEFAULT_PYFTPDLIB_SRC = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pyftpdlib"
+)
+sys.path.insert(0, os.environ.get("PYFTPDLIB_SRC", _DEFAULT_PYFTPDLIB_SRC))
 
 from pyftpdlib.authorizers import DummyAuthorizer
 from pyftpdlib.handlers import FTPHandler

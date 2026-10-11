@@ -46,9 +46,10 @@ setup.sh              one-time environment setup (JDK, Python compat shims)
 ./attack.sh    # runs the full simulation
 ```
 
-`setup.sh` / `attack.sh` assume `jftp/` and `pyftpdlib/` checkouts live at
-`/home/claude/work/477-spike/{jftp,pyftpdlib}`. Override with the
-`JFTP_SRC` / `PYFTPDLIB_SRC` env vars if yours live elsewhere, e.g.:
+By default, `setup.sh` / `attack.sh` find `jftp/` and `pyftpdlib/`
+automatically as siblings of this `attack/` folder (i.e. directly under the
+repo root, which is how this repo is actually laid out). Override with the
+`JFTP_SRC` / `PYFTPDLIB_SRC` env vars if you've moved things around, e.g.:
 
 ```sh
 JFTP_SRC=/path/to/jftp PYFTPDLIB_SRC=/path/to/pyftpdlib ./setup.sh

@@ -12,12 +12,25 @@
 set -euo pipefail
 
 DEMO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Adjust these (or export the env vars before running) to match where you
-# checked out jftp/ and pyftpdlib/ -- defaults assume this demo folder sits
-# next to a checkout laid out like the one it was generated against.
-JFTP_SRC="${JFTP_SRC:-/home/claude/work/477-spike/jftp}"
-PYFTPDLIB_SRC="${PYFTPDLIB_SRC:-/home/claude/work/477-spike/pyftpdlib}"
+# jftp/ and pyftpdlib/ are found automatically as siblings of this attack/
+# folder (i.e. directly under the repo root -- this repo's actual layout).
+# Override with the JFTP_SRC / PYFTPDLIB_SRC env vars if you've moved things.
+REPO_ROOT="$(cd "${DEMO_DIR}/.." && pwd)"
+JFTP_SRC="${JFTP_SRC:-${REPO_ROOT}/jftp}"
+PYFTPDLIB_SRC="${PYFTPDLIB_SRC:-${REPO_ROOT}/pyftpdlib}"
 export PYFTPDLIB_SRC
+
+if [[ ! -f "${JFTP_SRC}/src/java/net/sf/jftp/config/Crypto.java" ]]; then
+    echo "Could not find jftp/src/java/.../Crypto.java under ${JFTP_SRC}" >&2
+    echo "Set JFTP_SRC to the path of your jftp/ checkout and re-run." >&2
+    exit 1
+fi
+if [[ ! -f "${PYFTPDLIB_SRC}/pyftpdlib/__init__.py" ]]; then
+    echo "Could not find pyftpdlib/pyftpdlib/__init__.py under ${PYFTPDLIB_SRC}" >&2
+    echo "Set PYFTPDLIB_SRC to the path of your pyftpdlib/ checkout and re-run." >&2
+    exit 1
+fi
+
 CRYPTO_CP="${DEMO_DIR}/crypto_helper/out:${JFTP_SRC}/lib"
 
 SERVER_ROOT="${DEMO_DIR}/server_root"
@@ -48,6 +61,7 @@ cleanup() {
 trap cleanup EXIT
 
 section "0. Reset demo state"
+mkdir -p "${SERVER_ROOT}" "$(dirname "${BOOKMARK_FILE}")" "${ATTACKER_DIR}" "$(dirname "${LOG_FILE}")"
 # restore exam.txt from the fixture if a previous run deleted it (the
 # exploit step below deletes it from server_root by design)
 if [[ ! -f "${SERVER_ROOT}/exam.txt" ]]; then
