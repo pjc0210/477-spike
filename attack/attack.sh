@@ -355,9 +355,14 @@ while [[ ${#queue_paths[@]} -gt 0 ]]; do
     queue_paths=("${queue_paths[@]:1}")
     queue_depths=("${queue_depths[@]:1}")
 
-    listing=$(curl -sS "${AUTH[@]}" "${FTP_BASE}${dir_path#/}" 2>/dev/null) || continue
+    # curl only LISTs a directory when the URL ends in '/'. Without it,
+    # a child like pyftpdlib is RETR'd as a file and the walk skips it.
+    list_url="${FTP_BASE}${dir_path#/}"
+    [[ "${list_url}" == */ ]] || list_url="${list_url}/"
+    listing=$(curl -sS "${AUTH[@]}" "${list_url}" 2>/dev/null) || continue
 
     while IFS= read -r line; do
+        line="${line%$'\r'}"
         [[ -z "${line}" ]] && continue
         is_dir=0
         [[ "${line}" == d* ]] && is_dir=1
@@ -417,6 +422,7 @@ else
         walk=("${walk[@]:1}")
         listing=$(curl -sS "${AUTH[@]}" "${FTP_BASE}${cur#/}/" 2>/dev/null) || continue
         while IFS= read -r line; do
+            line="${line%$'\r'}"
             [[ -z "${line}" ]] && continue
             is_dir=0
             [[ "${line}" == d* ]] && is_dir=1
