@@ -26,8 +26,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Clears FTP passwords already written by the removed Store passwords option.
- * Host, user, port, and directories stay in place.
+ * Clears FTP passwords already written under the user's .jftp directory.
+ * Host, user, port, and directories stay in place. Bookmark password
+ * fields are replaced with Settings.hiddenPassword.
  */
 public final class StoredPasswordScrubber
 {
@@ -53,6 +54,35 @@ public final class StoredPasswordScrubber
         }
 
         blankLastConnectionPasswords(Settings.last_cons);
+        scrubBookmarkFile(Settings.bookmarks);
+    }
+
+    /**
+     * Bookmark lines store the password as the fourth '#' field.
+     * Replace that field with the token BookmarkItem already treats as
+     * "ask the user". Comments and directory tags stay as they are.
+     */
+    public static String scrubBookmarkText(String text)
+    {
+        if(text == null)
+        {
+            return "";
+        }
+
+        String[] lines = text.split("\n", -1);
+        StringBuilder out = new StringBuilder();
+
+        for(int i = 0; i < lines.length; i++)
+        {
+            if(i > 0)
+            {
+                out.append('\n');
+            }
+
+            out.append(scrubBookmarkLine(lines[i]));
+        }
+
+        return out.toString();
     }
 
     /**
@@ -69,6 +99,69 @@ public final class StoredPasswordScrubber
 
         lines.set(2, "");
         writeLines(path, lines);
+    }
+
+    private static void scrubBookmarkFile(String path)
+    {
+        List<String> lines = readLines(path);
+
+        if(lines == null)
+        {
+            return;
+        }
+
+        boolean changed = false;
+
+        for(int i = 0; i < lines.size(); i++)
+        {
+            String updated = scrubBookmarkLine(lines.get(i));
+
+            if(!updated.equals(lines.get(i)))
+            {
+                lines.set(i, updated);
+                changed = true;
+            }
+        }
+
+        if(changed)
+        {
+            writeLines(path, lines);
+        }
+    }
+
+    private static String scrubBookmarkLine(String line)
+    {
+        String trimmed = line.trim();
+
+        if(trimmed.equals("") || trimmed.startsWith("#") ||
+               trimmed.toLowerCase().startsWith("<dir>") ||
+               trimmed.toLowerCase().startsWith("<enddir>"))
+        {
+            return line;
+        }
+
+        String[] parts = line.split("#", -1);
+
+        if(parts.length < 4)
+        {
+            return line;
+        }
+
+        parts[3] = Settings.hiddenPassword;
+
+        StringBuilder rebuilt = new StringBuilder();
+
+        for(int i = 0; i < parts.length; i++)
+        {
+            if(i > 0)
+            {
+                rebuilt.append('#');
+            }
+
+            rebuilt.append(parts[i]);
+        }
+
+        return rebuilt.toString();
     }
 
     /**
